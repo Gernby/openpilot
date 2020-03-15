@@ -645,7 +645,6 @@ class CarInterface(CarInterfaceBase):
     #print(self.lac_log is None, self.gernbyServer is None)
     #print(len(self.cp_cam.vl.values()), self.cp_cam.vl.values())
     if not self.lac_log is None and not self.gernbyServer is None:
-      ret.steeringRateLimited = self.lac.steeringRateLimited
       self.send_frames += 1   
       self.car_values.append("%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%d|" % (ret.steeringAngle, ret.steeringRate, ret.steeringTorque, ret.steeringTorqueEps, \
                                                     self.cp.vl['KINEMATICS']['YAW'], self.cp.vl['KINEMATICS']['LAT_ACCEL'], self.cp.vl['KINEMATICS']['LONG_ACCEL'], self.lac_log.p, \
