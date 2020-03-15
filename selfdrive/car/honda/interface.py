@@ -643,6 +643,7 @@ class CarInterface(CarInterfaceBase):
     self.brake_pressed_prev = ret.brakePressed
 
     #print(self.lac_log is None, self.gernbyServer is None)
+    #print(len(self.cp_cam.vl.values()), self.cp_cam.vl.values())
     if not self.lac_log is None and not self.gernbyServer is None:
       ret.steeringRateLimited = self.lac.steeringRateLimited
       self.send_frames += 1   
@@ -684,13 +685,18 @@ class CarInterface(CarInterfaceBase):
         except zmq.ZMQError:
           context = zmq.Context()
           self.gernbyServer = context.socket(zmq.PUSH)
+          #self.gernbyServer.connect("tcp://192.168.1.3:8593")
           self.gernbyServer.connect("tcp://gernstation.synology.me:8593")
         self.camera_values = [self.camera_insert_format]
         self.car_values = [self.car_insert_format]
         self.send_frames = 0
     elif self.frame % 1000 == 999:
+      #print(self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL'])
+      #print(self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL'])
+      #print(self.car_values, self.camera_values)
       context = zmq.Context()
       self.gernbyServer = context.socket(zmq.PUSH)
+      #self.gernbyServer.connect("tcp://192.168.1.3:8593")
       self.gernbyServer.connect("tcp://gernstation.synology.me:8593")
     # cast to reader so it can't be modified
     return ret.as_reader()

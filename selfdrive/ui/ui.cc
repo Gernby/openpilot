@@ -1005,8 +1005,8 @@ int main(int argc, char* argv[]) {
 
         s->alert_sound_timeout = 2 * UI_FREQ;
 
-        s->alert_sound = cereal_CarControl_HUDControl_AudibleAlert_chimeWarningRepeat;
-        play_alert_sound(s->alert_sound);
+        //s->alert_sound = cereal_CarControl_HUDControl_AudibleAlert_chimeWarningRepeat;
+        //play_alert_sound(s->alert_sound);
       }
       s->alert_sound_timeout--;
       s->controls_seen = false;
