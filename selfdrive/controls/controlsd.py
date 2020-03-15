@@ -339,6 +339,8 @@ def data_send(sm, pm, CS, CI, CP, VM, state, events, actuators, v_cruise_kph, rk
 
   if not read_only:
     # send car controls over can
+    CI.lac_log = lac_log
+    CI.lac = LaC
     can_sends = CI.apply(CC)
     pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 

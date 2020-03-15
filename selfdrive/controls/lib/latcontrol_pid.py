@@ -14,6 +14,9 @@ class LatControlPID():
                             k_f=CP.lateralTuning.pid.kf, pos_limit=1.0, sat_limit=CP.steerLimitTimer)
     self.angle_steers_des = 0.
     self.mpc_frame = 0
+    self.accel_limit = 0.05      # 100x degrees/sec**2
+    self.angle_rate_des = 0.0    # degrees/sec, rate dynamically limited by accel_limit
+    self.steeringRateLimited = False
 
   def reset(self):
     self.pid.reset()
@@ -37,17 +40,22 @@ class LatControlPID():
   def update(self, active, v_ego, angle_steers, angle_steers_rate, eps_torque, steer_override, rate_limited, CP, path_plan):
 
     self.live_tune(CP)
- 
+
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steerAngle = float(angle_steers)
     pid_log.steerRate = float(angle_steers_rate)
 
     if v_ego < 0.3 or not active:
+      self.angle_rate_des = angle_steers_rate
+      self.angle_steers_des = angle_steers
       output_steer = 0.0
       pid_log.active = False
+      self.steeringRateLimited = False
       self.pid.reset()
     else:
-      self.angle_steers_des = path_plan.angleSteers  # get from MPC/PathPlanner
+      self.angle_rate_des = min(self.angle_rate_des + self.accel_limit, max(self.angle_rate_des - self.accel_limit, path_plan.angleSteers - self.angle_steers_des))
+      self.angle_steers_des = min(path_plan.angleSteers + 5, angle_steers + 5, max(path_plan.angleSteers - 5, angle_steers - 5, self.angle_steers_des + self.angle_rate_des))
+      self.steeringRateLimited = (self.angle_steers_des != path_plan.angleSteers)
 
       steers_max = get_steer_max(CP, v_ego)
       self.pid.pos_limit = steers_max

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import numpy as np
+import time
+import zmq
 from cereal import car
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
+from common.params import Params
 from selfdrive.swaglog import cloudlog
 from selfdrive.config import Conversions as CV
 from selfdrive.controls.lib.drive_helpers import create_event, EventTypes as ET, get_events
@@ -84,7 +87,21 @@ class CarInterface(CarInterfaceBase):
 
     self.cp = get_can_parser(CP)
     self.cp_cam = get_cam_can_parser(CP)
-
+    self.prev_lane_1 = 0
+    self.prev_lane_2 = 0
+    self.camera_keys = []
+    self.can_time = 0
+    params = Params()
+    self.user_id = params.get('DongleId')
+    self.gernbyServer = None
+    self.send_frames = 0
+    self.lac_log = None
+    self.path_plan = None
+    self.lac = None
+    self.car_insert_format = 'userData,fingerprint=%s,user=%s ' % (self.CP.carFingerprint.replace(" ","_"), str(self.user_id)[2:-1]) 
+    self.car_insert_format += 'angle_steers=%s,angle_rate=%s,driver_torque=%s,request=%s,angle_rate_eps=%s,yaw_rate_can=%s,lateral_accel=%s,long_accel=%s,p=%s,i=%s,f=%s %s\n~'
+    self.car_values = [self.car_insert_format]
+  
     # *** init the major players ***
     self.CS = CarState(CP)
     self.VM = VehicleModel(CP)
@@ -415,6 +432,8 @@ class CarInterface(CarInterfaceBase):
   # returns a car.CarState
   def update(self, c, can_strings):
     # ******************* do can recv *******************
+    self.can_time = max(int(time.time() * 100) * 10, self.can_time + 10)
+
     self.cp.update_strings(can_strings)
     self.cp_cam.update_strings(can_strings)
 
@@ -623,6 +642,56 @@ class CarInterface(CarInterfaceBase):
     self.gas_pressed_prev = ret.gasPressed
     self.brake_pressed_prev = ret.brakePressed
 
+    #print(self.lac_log is None, self.gernbyServer is None)
+    if not self.lac_log is None and not self.gernbyServer is None:
+      ret.steeringRateLimited = self.lac.steeringRateLimited
+      self.send_frames += 1   
+      self.car_values.append("%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%d|" % (ret.steeringAngle, ret.steeringRate, ret.steeringTorque, ret.steeringTorqueEps, \
+                                                    self.cp.vl['KINEMATICS']['YAW'], self.cp.vl['KINEMATICS']['LAT_ACCEL'], self.cp.vl['KINEMATICS']['LONG_ACCEL'], self.lac_log.p, \
+                                                    self.lac_log.i, self.lac_log.f, self.lac.angle_steers_des, self.can_time))
+
+      if self.CP.carFingerprint in HONDA_BOSCH and \
+        self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL'] != self.prev_lane_2 and \
+        self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL'] != self.prev_lane_1:
+        self.prev_lane_2 = self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL']
+        self.prev_lane_1 = self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL']
+        if len(self.camera_keys) < 89:
+          self.camera_keys = list(np.array(list(self.cp_cam.vl.keys()))[1::2])
+          self.camera_ids = list(np.array(list(self.cp_cam.vl.keys()))[::2])
+          for i in range(len(self.camera_keys),0,-1):
+            if self.camera_keys[i-1] in ['ACC_CONTROL','STEERING_CONTROL']: 
+              self.camera_keys.pop(i-1)
+              self.camera_ids.pop(i-1)
+          self.camera_insert_format = 'userData,fingerprint=%s,user=%s ' % (self.CP.carFingerprint.replace(" ","_"), str(self.user_id)[2:-1])
+          for id in self.camera_ids:
+            self.camera_insert_format += '_%s=%s,' % (id, "%s")
+          self.camera_insert_format = self.camera_insert_format[:-1] + ' %s\n~'
+          self.camera_values = [self.camera_insert_format]
+          print(self.camera_insert_format)
+          self.send_frames = 0
+        else: 
+          self.send_frames += 1
+          for key in self.camera_keys:
+            self.camera_values.append("%d," % self.cp_cam.vl[key]['FULL'])
+          self.camera_values.append('%d|' % self.can_time)
+      elif self.send_frames >= 100:
+        self.car_values.append("!")
+        self.camera_values.append("!")
+        send_data_string = "".join(["".join(self.car_values), "".join(self.camera_values)])
+        try:
+          self.gernbyServer.send_string(send_data_string, flags=zmq.NOBLOCK)
+          print(len(send_data_string))
+        except zmq.ZMQError:
+          context = zmq.Context()
+          self.gernbyServer = context.socket(zmq.PUSH)
+          self.gernbyServer.connect("tcp://gernstation.synology.me:8593")
+        self.camera_values = [self.camera_insert_format]
+        self.car_values = [self.car_insert_format]
+        self.send_frames = 0
+    elif self.frame % 1000 == 999:
+      context = zmq.Context()
+      self.gernbyServer = context.socket(zmq.PUSH)
+      self.gernbyServer.connect("tcp://gernstation.synology.me:8593")
     # cast to reader so it can't be modified
     return ret.as_reader()
 
