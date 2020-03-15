@@ -38,6 +38,9 @@ class CarInterface(CarInterfaceBase):
     self.pt_cp = get_powertrain_can_parser(CP, canbus)
     self.ch_cp = get_chassis_can_parser(CP, canbus)
     self.ch_cp_dbc_name = DBC[CP.carFingerprint]['chassis']
+    self.lac_log = None
+    self.path_plan = None
+    self.lac = None
 
     self.CC = None
     if CarController is not None:

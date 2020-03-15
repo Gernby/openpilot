@@ -23,6 +23,9 @@ class CarInterface(CarInterfaceBase):
     self.VM = VehicleModel(CP)
     self.pt_cp = get_powertrain_can_parser(CP)
     self.cam_cp = get_camera_can_parser(CP)
+    self.lac_log = None
+    self.path_plan = None
+    self.lac = None
 
     self.gas_pressed_prev = False
 
