@@ -99,7 +99,7 @@ class CarInterface(CarInterfaceBase):
     self.path_plan = None
     self.lac = None
     self.car_insert_format = 'userData,fingerprint=%s,user=%s ' % (self.CP.carFingerprint.replace(" ","_"), str(self.user_id)[2:-1]) 
-    self.car_insert_format += 'angle_steers=%s,angle_rate=%s,driver_torque=%s,request=%s,angle_rate_eps=%s,yaw_rate_can=%s,lateral_accel=%s,long_accel=%s,p=%s,i=%s,f=%s %s\n~'
+    self.car_insert_format += 'v_ego=%s,request=%s,angle_steers=%s,angle_rate=%s,driver_torque=%s,angle_rate_eps=%s,yaw_rate_can=%s,lateral_accel=%s,long_accel=%s,p=%s,i=%s,f=%s,angle_steers_des=%s %s\n~'
     self.car_values = [self.car_insert_format]
   
     # *** init the major players ***
@@ -644,17 +644,18 @@ class CarInterface(CarInterfaceBase):
 
     #print(self.lac_log is None, self.gernbyServer is None)
     #print(len(self.cp_cam.vl.values()), self.cp_cam.vl.values())
-    if not self.lac_log is None and not self.gernbyServer is None:
+    if ret.vEgo > 0 and not self.lac_log is None and not self.gernbyServer is None:
       self.send_frames += 1   
-      self.car_values.append("%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%d|" % (ret.steeringAngle, ret.steeringRate, ret.steeringTorque, ret.steeringTorqueEps, \
-                                                    self.cp.vl['KINEMATICS']['YAW'], self.cp.vl['KINEMATICS']['LAT_ACCEL'], self.cp.vl['KINEMATICS']['LONG_ACCEL'], self.lac_log.p, \
-                                                    self.lac_log.i, self.lac_log.f, self.lac.angle_steers_des, self.can_time))
+
+      self.car_values.append("%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%d|" % (ret.vEgo, min(1, max(-1, self.lac.pid.p + self.lac.pid.i + self.lac.pid.f)), ret.steeringAngle, \
+                                        ret.steeringRate, ret.steeringTorque, ret.steeringTorqueEps, self.cp.vl['KINEMATICS']['YAW'], self.cp.vl['KINEMATICS']['LAT_ACCEL'], self.cp.vl['KINEMATICS']['LONG_ACCEL'], \
+                                        self.lac.pid.p, self.lac.pid.i, self.lac.pid.f, self.lac.angle_steers_des, self.can_time))
 
       if self.CP.carFingerprint in HONDA_BOSCH and \
         self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL'] != self.prev_lane_2 and \
         self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL'] != self.prev_lane_1:
         self.prev_lane_2 = self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL']
-        self.prev_lane_1 = self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL']
+        self.prev_lane_1 = self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL'] 
         if len(self.camera_keys) < 89:
           self.camera_keys = list(np.array(list(self.cp_cam.vl.keys()))[1::2])
           self.camera_ids = list(np.array(list(self.cp_cam.vl.keys()))[::2])
@@ -689,7 +690,7 @@ class CarInterface(CarInterfaceBase):
         self.camera_values = [self.camera_insert_format]
         self.car_values = [self.car_insert_format]
         self.send_frames = 0
-    elif self.frame % 1000 == 999:
+    elif self.gernbyServer is None and self.frame % 1000 == 999:
       #print(self.cp_cam.vl['ADJ_LANE_RIGHT_2']['FULL'])
       #print(self.cp_cam.vl['CUR_LANE_LEFT_1']['FULL'])
       #print(self.car_values, self.camera_values)
@@ -697,6 +698,7 @@ class CarInterface(CarInterfaceBase):
       self.gernbyServer = context.socket(zmq.PUSH)
       #self.gernbyServer.connect("tcp://192.168.1.3:8593")
       self.gernbyServer.connect("tcp://gernstation.synology.me:8593")
+    
     # cast to reader so it can't be modified
     return ret.as_reader()
 
