@@ -14,22 +14,7 @@ if [ -z "$PASSIVE" ]; then
   export PASSIVE="1"
 fi
 
-STAGING_ROOT="/data/safe_staging"
-
 function launch {
-  # Wifi scan
-  wpa_cli IFNAME=wlan0 SCAN
-
-  # apply update only if no_ota_updates does not exist in /data directory
-  file="/data/no_ota_updates"
-  if ! [ -f "$file" ]; then
-    if [ "$(git rev-parse HEAD)" != "$(git rev-parse @{u})" ]; then
-      git reset --hard @{u} &&
-      git clean -xdf &&
-      
-      exec "${BASH_SOURCE[0]}"
-    fi
-  fi
 
   # no cpu rationing for now
   echo 0-3 > /dev/cpuset/background/cpus
@@ -40,21 +25,11 @@ function launch {
 
   DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
-  # Remove old NEOS update file
-  # TODO: move this code to the updater
-  if [ -d /data/neoupdate ]; then
-    rm -rf /data/neoupdate
+  if ! [ -f "/data/openpilot/cereal/car.capnp" ]; then
+    git submodule init
+    git submodule update
+    exec "${BASH_SOURCE[0]}"
   fi
-
-  # Check for NEOS update
-  if [ $(< /VERSION) != "14" ]; then
-    if [ -f "$DIR/scripts/continue.sh" ]; then
-      cp "$DIR/scripts/continue.sh" "/data/data/com.termux/files/continue.sh"
-    fi
-
-    "$DIR/installer/updater/updater" "file://$DIR/installer/updater/update.json"
-  fi
-
 
   # handle pythonpath
   ln -sfn $(pwd) /data/pythonpath
