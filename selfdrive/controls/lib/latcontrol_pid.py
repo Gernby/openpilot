@@ -46,7 +46,7 @@ class LatControlPID():
       deadzone = 0.0
 
       check_saturation = (v_ego > 10) and not rate_limited and not steer_override
-      output_steer = self.pid.update(self.angle_steers_des, angle_steers + 0.01 * angle_steers_rate, check_saturation=check_saturation, override=steer_override,
+      output_steer = self.pid.update(self.angle_steers_des, angle_steers, check_saturation=check_saturation, override=steer_override,
                                      feedforward=steer_feedforward, speed=v_ego, deadzone=deadzone)
       pid_log.active = True
       pid_log.p = self.pid.p
