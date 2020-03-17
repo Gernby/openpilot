@@ -10,6 +10,8 @@ class LatControlPID():
                             (CP.lateralTuning.pid.kiBP, CP.lateralTuning.pid.kiV),
                             k_f=CP.lateralTuning.pid.kf, pos_limit=1.0, sat_limit=CP.steerLimitTimer)
     self.angle_steers_des = 0.
+    self.accel_limit = 0.01      # 100x degrees/sec**2
+    self.angle_rate_des = 0.0    # degrees/sec, rate dynamically limited by accel_limit
 
   def reset(self):
     self.pid.reset()
@@ -22,9 +24,16 @@ class LatControlPID():
     if v_ego < 0.3 or not active:
       output_steer = 0.0
       pid_log.active = False
+      self.angle_rate_des = angle_steers_rate / 100.
+      self.angle_steers_des = angle_steers
       self.pid.reset()
     else:
-      self.angle_steers_des = path_plan.angleSteers  # get from MPC/PathPlanner
+      if not steer_override and abs(angle_steers) < 10 and v_ego > 10:
+        self.angle_rate_des = min(self.angle_rate_des + self.accel_limit * v_ego, max(self.angle_rate_des - self.accel_limit * v_ego, path_plan.angleSteers - self.angle_steers_des))
+        self.angle_steers_des = self.angle_steers_des + self.angle_rate_des
+      else:
+        self.angle_rate_des = angle_steers_rate / 100.
+        self.angle_steers_des = path_plan.angleSteers
 
       steers_max = get_steer_max(CP, v_ego)
       self.pid.pos_limit = steers_max
@@ -37,7 +46,7 @@ class LatControlPID():
       deadzone = 0.0
 
       check_saturation = (v_ego > 10) and not rate_limited and not steer_override
-      output_steer = self.pid.update(self.angle_steers_des, angle_steers, check_saturation=check_saturation, override=steer_override,
+      output_steer = self.pid.update(self.angle_steers_des, angle_steers + 0.01 * angle_steers_rate, check_saturation=check_saturation, override=steer_override,
                                      feedforward=steer_feedforward, speed=v_ego, deadzone=deadzone)
       pid_log.active = True
       pid_log.p = self.pid.p

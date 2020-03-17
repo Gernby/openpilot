@@ -88,7 +88,10 @@ def get_can_signals(CP):
                 ("MAIN_ON", "SCM_FEEDBACK", 0),
                 ("CRUISE_CONTROL_LABEL", "ACC_HUD", 0),
                 ("EPB_STATE", "EPB_STATUS", 0),
-                ("CRUISE_SPEED", "ACC_HUD", 0)]
+                ("CRUISE_SPEED", "ACC_HUD", 0),
+                ("LONG_ACCEL", "KINEMATICS",0),
+                ("LAT_ACCEL", "KINEMATICS",0),
+                ("YAW", "KINEMATICS",0)]
     checks += [("GAS_PEDAL_2", 100)]
   else:
     # Nidec signals.
@@ -105,6 +108,8 @@ def get_can_signals(CP):
 
   if CP.carFingerprint in (CAR.ACCORD, CAR.ACCORD_15, CAR.ACCORDH, CAR.CIVIC_BOSCH, CAR.CIVIC_BOSCH_DIESEL, CAR.CRV_HYBRID, CAR.INSIGHT):
     signals += [("DRIVERS_DOOR_OPEN", "SCM_FEEDBACK", 1)]
+    if not CP.carFingerprint in (CAR.CIVIC_BOSCH, CAR.CRV_HYBRID): 
+      signals += [("LEAD_DISTANCE", "RADAR_HUD", 0)]
   elif CP.carFingerprint == CAR.ODYSSEY_CHN:
     signals += [("DRIVERS_DOOR_OPEN", "SCM_BUTTONS", 1)]
   else:
@@ -163,6 +168,8 @@ class CarState(CarStateBase):
     self.cruise_setting = 0
     self.v_cruise_pcm_prev = 0
     self.cruise_mode = 0
+    self.lead_distance = 255
+    self.brake_pressed = 0
 
   def update(self, cp, cp_cam):
     ret = car.CarState.new_message()
@@ -174,11 +181,14 @@ class CarState(CarStateBase):
     # update prevs, update must run once per loop
     self.prev_cruise_buttons = self.cruise_buttons
     self.prev_cruise_setting = self.cruise_setting
+    self.prev_cruise_buttons = self.cruise_buttons
+    self.prev_lead_distance = self.lead_distance
 
     # ******************* parse out can *******************
     if self.CP.carFingerprint in (CAR.ACCORD, CAR.ACCORD_15, CAR.ACCORDH, CAR.CIVIC_BOSCH, CAR.CIVIC_BOSCH_DIESEL, CAR.CRV_HYBRID, CAR.INSIGHT): # TODO: find wheels moving bit in dbc
       ret.standstill = cp.vl["ENGINE_DATA"]['XMISSION_SPEED'] < 0.1
       ret.doorOpen = bool(cp.vl["SCM_FEEDBACK"]['DRIVERS_DOOR_OPEN'])
+      if not self.CP.carFingerprint in (CAR.CIVIC_BOSCH, CAR.CRV_HYBRID): self.lead_distance = cp.vl["RADAR_HUD"]['LEAD_DISTANCE']
     elif self.CP.carFingerprint == CAR.ODYSSEY_CHN:
       ret.standstill = cp.vl["ENGINE_DATA"]['XMISSION_SPEED'] < 0.1
       ret.doorOpen = bool(cp.vl["SCM_BUTTONS"]['DRIVERS_DOOR_OPEN'])
@@ -323,7 +333,96 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in HONDA_BOSCH:
       signals += [("ACCEL_COMMAND", "ACC_CONTROL", 0),
-                  ("AEB_STATUS", "ACC_CONTROL", 0)]
+                ("AEB_STATUS", "ACC_CONTROL", 0), 
+                ("FULL", "SOMETHING", 0),
+                ("FULL", "CUR_LANE_LEFT_1", 0),
+                ("FULL", "CUR_LANE_LEFT_2", 0),
+                ("FULL", "CUR_LANE_RIGHT_1", 0),
+                ("FULL", "CUR_LANE_RIGHT_2", 0),
+                ("FULL", "ADJ_LANE_LEFT_1", 0),
+                ("FULL", "ADJ_LANE_LEFT_2", 0),
+                ("FULL", "ADJ_LANE_RIGHT_1", 0),
+                ("FULL", "ADJ_LANE_RIGHT_2", 0),
+                ("FULL", "OBJECT_A1", 0),
+                ("FULL", "OBJECT_A2", 0),
+                ("FULL", "OBJECT_A3", 0),
+                ("FULL", "OBJECT_A4", 0),
+                ("FULL", "OBJECT_A5", 0),
+                ("FULL", "OBJECT_A6", 0),
+                ("FULL", "OBJECT_A7", 0),
+                ("FULL", "OBJECT_A8", 0),
+                ("FULL", "OBJECT_A9", 0),
+                ("FULL", "OBJECT_A10", 0),
+                ("FULL", "OBJECT_A11", 0),
+                ("FULL", "OBJECT_A12", 0),
+                ("FULL", "OBJECT_A13", 0),
+                ("FULL", "OBJECT_A14", 0),
+                ("FULL", "OBJECT_A15", 0),
+                ("FULL", "OBJECT_A16", 0),
+                ("FULL", "OBJECT_A17", 0),
+                ("FULL", "OBJECT_A18", 0),
+                ("FULL", "OBJECT_A19", 0),
+                ("FULL", "OBJECT_A20", 0),
+                ("FULL", "OBJECT_A21", 0),
+                ("FULL", "OBJECT_A22", 0),
+                ("FULL", "OBJECT_A23", 0),
+                ("FULL", "OBJECT_A24", 0),
+                ("FULL", "OBJECT_B1", 0),
+                ("FULL", "OBJECT_B2", 0),
+                ("FULL", "OBJECT_B3", 0),
+                ("FULL", "OBJECT_B4", 0),
+                ("FULL", "OBJECT_B5", 0),
+                ("FULL", "OBJECT_B6", 0),
+                ("FULL", "OBJECT_B7", 0),
+                ("FULL", "OBJECT_B8", 0),
+                ("FULL", "OBJECT_B9", 0),
+                ("FULL", "OBJECT_B10", 0),
+                ("FULL", "OBJECT_B11", 0),
+                ("FULL", "OBJECT_B12", 0),
+                ("FULL", "OBJECT_B13", 0),
+                ("FULL", "OBJECT_B14", 0),
+                ("FULL", "OBJECT_B15", 0),
+                ("FULL", "OBJECT_B16", 0),
+                ("FULL", "OBJECT_B17", 0),
+                ("FULL", "OBJECT_B18", 0),
+                ("FULL", "OBJECT_B19", 0),
+                ("FULL", "OBJECT_B20", 0),
+                ("FULL", "OBJECT_B21", 0),
+                ("FULL", "OBJECT_B22", 0),
+                ("FULL", "OBJECT_B23", 0),
+                ("FULL", "OBJECT_B24", 0),
+                ("FULL", "OBJECT_B25", 0),
+                ("FULL", "OBJECT_B26", 0),
+                ("FULL", "OBJECT_B27", 0),
+                ("FULL", "OBJECT_B28", 0),
+                ("FULL", "OBJECT_B29", 0),
+                ("FULL", "OBJECT_B30", 0),
+                ("FULL", "OBJECT_B31", 0),
+                ("FULL", "OBJECT_B32", 0),
+                ("FULL", "OBJECT_B33", 0),
+                ("FULL", "OBJECT_B34", 0),
+                ("FULL", "OBJECT_B35", 0),
+                ("FULL", "OBJECT_B36", 0),
+                ("FULL", "OBJECT_B37", 0),
+                ("FULL", "OBJECT_B38", 0),
+                ("FULL", "OBJECT_B39", 0),
+                ("FULL", "OBJECT_B40", 0),
+                ("FULL", "OBJECT_B41", 0),
+                ("FULL", "OBJECT_B42", 0),
+                ("FULL", "OBJECT_B43", 0),
+                ("FULL", "OBJECT_B44", 0),
+                ("FULL", "OBJECT_B45", 0),
+                ("FULL", "OBJECT_B46", 0),
+                ("FULL", "OBJECT_B47", 0),
+                ("FULL", "OBJECT_B48", 0),
+                ("FULL", "OBJECT_B49", 0),
+                ("FULL", "OBJECT_B50", 0),
+                ("FULL", "OBJECT_B51", 0),
+                ("FULL", "OBJECT_B52", 0),
+                ("FULL", "OBJECT_B53", 0),
+                ("FULL", "OBJECT_B54", 0),
+                ("FULL", "OBJECT_B55", 0),
+                ("FULL", "OBJECT_B56", 0)]
     else:
       signals += [("COMPUTER_BRAKE", "BRAKE_COMMAND", 0),
                   ("AEB_REQ_1", "BRAKE_COMMAND", 0),
@@ -341,4 +440,7 @@ class CarState(CarStateBase):
       checks = [(0x194, 100)]
 
     bus_cam = 1 if CP.carFingerprint in HONDA_BOSCH  and not CP.isPandaBlack else 2
-    return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, bus_cam)
+    if CP.carFingerprint in HONDA_BOSCH:
+      return CANParser('bosch_camera', signals, checks, bus_cam)  
+    else:
+      return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, bus_cam)

@@ -254,13 +254,24 @@ static void ui_draw_track(UIState *s, bool is_mpc, track_vertices_data *pvd) {
   NVGpaint track_bg;
   if (is_mpc) {
     // Draw colored MPC track
-    const uint8_t *clr = bg_colors[s->status];
-    track_bg = nvgLinearGradient(s->vg, vwp_w, vwp_h, vwp_w, vwp_h*.4,
-      nvgRGBA(clr[0], clr[1], clr[2], 255), nvgRGBA(clr[0], clr[1], clr[2], 255/2));
+    if (scene->steerOverride) {
+      track_bg = nvgLinearGradient(s->vg, vwp_w, vwp_h, vwp_w, vwp_h*.4,
+        nvgRGBA(0, 191, 255, 235), nvgRGBA(0, 95, 128, 30));
+    } else {  //if (s->scene.recording) {
+      int torque_scale = (int)fabs(510*(float)s->scene.output_scale);
+      int red_lvl = fmin(255, torque_scale);
+      int green_lvl = fmin(255, 510-torque_scale);
+      track_bg = nvgLinearGradient(s->vg, vwp_w, vwp_h, vwp_w, vwp_h*.4,
+        nvgRGBA(          red_lvl,            green_lvl,  0, 235),
+        nvgRGBA((int)(0.5*red_lvl), (int)(0.5*green_lvl), 0, 30));
+    } /*else {
+      track_bg = nvgLinearGradient(s->vg, vwp_w, vwp_h, vwp_w, vwp_h*.4,
+        nvgRGBA(0, 200, 30, 235), nvgRGBA(0, 100, 30, 30));
+    }*/
   } else {
     // Draw white vision track
     track_bg = nvgLinearGradient(s->vg, vwp_w, vwp_h, vwp_w, vwp_h*.4,
-      nvgRGBA(255, 255, 255, 255), nvgRGBA(255, 255, 255, 0));
+      nvgRGBA(255, 255, 255, 235), nvgRGBA(255, 255, 255, 30));
   }
 
   nvgFillPaint(s->vg, track_bg);
@@ -877,14 +888,11 @@ static void ui_draw_blank(UIState *s) {
 }
 
 void ui_draw(UIState *s) {
+  ui_draw_sidebar(s);
   if (s->vision_connected && s->active_app == cereal_UiLayoutState_App_home && s->status != STATUS_STOPPED) {
-    ui_draw_sidebar(s);
     ui_draw_vision(s);
   } else {
     ui_draw_blank(s);
-    if (!s->scene.uilayout_sidebarcollapsed) {
-      ui_draw_sidebar(s);
-    }
   }
 
   {
