@@ -17,6 +17,7 @@
 
 #include "ui.hpp"
 #include "sound.hpp"
+#include "dashcam.h"
 
 static int last_brightness = -1;
 static void set_brightness(UIState *s, int brightness) {
@@ -152,6 +153,8 @@ static void ui_init(UIState *s) {
   s->thermal_sock = SubSocket::create(s->ctx, "thermal");
   s->health_sock = SubSocket::create(s->ctx, "health");
   s->ubloxgnss_sock = SubSocket::create(s->ctx, "ubloxGnss");
+  s->carstate_sock = SubSocket::create(s->ctx, "carState");
+  s->livempc_sock= SubSocket::create(s->ctx, "liveMpc");
 
   assert(s->model_sock != NULL);
   assert(s->controlsstate_sock != NULL);
@@ -161,6 +164,8 @@ static void ui_init(UIState *s) {
   assert(s->thermal_sock != NULL);
   assert(s->health_sock != NULL);
   assert(s->ubloxgnss_sock != NULL);
+  assert(s->carstate_sock != NULL);
+  assert(s->livempc_sock != NULL);
 
   s->poller = Poller::create({
                               s->model_sock,
@@ -170,7 +175,9 @@ static void ui_init(UIState *s) {
                               s->radarstate_sock,
                               s->thermal_sock,
                               s->health_sock,
-                              s->ubloxgnss_sock
+                              s->ubloxgnss_sock,
+	                            s->carstate_sock,
+                              s->livempc_sock
                              });
 
 #ifdef SHOW_SPEEDLIMIT
@@ -313,6 +320,9 @@ void handle_message(UIState *s, Message * msg) {
     struct cereal_ControlsState datad;
     cereal_read_ControlsState(&datad, eventd.controlsState);
 
+    struct cereal_ControlsState_LateralPIDState pdata;
+    cereal_read_ControlsState_LateralPIDState(&pdata, datad.lateralControlState.pidState);
+
     s->controls_timeout = 1 * UI_FREQ;
     s->controls_seen = true;
 
@@ -322,6 +332,9 @@ void handle_message(UIState *s, Message * msg) {
     s->scene.v_cruise = datad.vCruise;
     s->scene.v_ego = datad.vEgo;
     s->scene.curvature = datad.curvature;
+    s->scene.angleSteers = datad.angleSteers;
+    s->scene.steerOverride= datad.steerOverride;
+    s->scene.output_scale = pdata.output;
     s->scene.engaged = datad.enabled;
     s->scene.engageable = datad.engageable;
     s->scene.gps_planner_active = datad.gpsPlannerActive;
@@ -600,7 +613,7 @@ static void ui_update(UIState *s) {
     if (ret < 0) {
       if (errno == EINTR) continue;
 
-      LOGE("poll failed (%d - %d)", ret, errno);
+      LOGW("poll failed (%d)", ret);
       close(s->ipc_fd);
       s->ipc_fd = -1;
       s->vision_connected = false;
@@ -968,6 +981,14 @@ int main(int argc, char* argv[]) {
       should_swap = true;
     }
 
+    // Don't waste resources on drawing in case screen is off or car is not started.
+    if (s->awake && s->vision_connected) {
+      dashcam(s, touch_x, touch_y);
+      ui_draw(s);
+      glFinish();
+      should_swap = true;
+    }
+
     if (s->volume_timeout > 0) {
       s->volume_timeout--;
     } else {
@@ -999,8 +1020,8 @@ int main(int argc, char* argv[]) {
 
         s->alert_sound_timeout = 2 * UI_FREQ;
 
-        s->alert_sound = cereal_CarControl_HUDControl_AudibleAlert_chimeWarningRepeat;
-        play_alert_sound(s->alert_sound);
+        //s->alert_sound = cereal_CarControl_HUDControl_AudibleAlert_chimeWarningRepeat;
+        //play_alert_sound(s->alert_sound);
       }
       s->alert_sound_timeout--;
       s->controls_seen = false;

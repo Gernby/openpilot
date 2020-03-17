@@ -25,6 +25,8 @@ class CarInterfaceBase():
     self.CS = CarState(CP)
     self.cp = self.CS.get_can_parser(CP)
     self.cp_cam = self.CS.get_cam_can_parser(CP)
+    self.lac = None
+    self.allow_gas_press = False      
 
     self.CC = None
     if CarController is not None:
@@ -108,7 +110,7 @@ class CarInterfaceBase():
     # Disable on rising edge of gas or brake. Also disable on brake when speed > 0.
     # Optionally allow to press gas at zero speed to resume.
     # e.g. Chrysler does not spam the resume button yet, so resuming with gas is handy. FIXME!
-    if (cs_out.gasPressed and (not self.gas_pressed_prev) and cs_out.vEgo > gas_resume_speed) or \
+    if (cs_out.gasPressed and (not self.allow_gas_press and not self.gas_pressed_prev) and cs_out.vEgo > gas_resume_speed) or \
        (cs_out.brakePressed and (not self.brake_pressed_prev or not cs_out.standstill)):
       events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
 

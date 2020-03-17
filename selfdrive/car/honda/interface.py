@@ -3,6 +3,7 @@ import numpy as np
 import time
 import zmq
 from cereal import car
+from common.params import Params
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
 from selfdrive.swaglog import cloudlog
@@ -82,6 +83,21 @@ class CarInterface(CarInterfaceBase):
       self.compute_gb = get_compute_gb_acura()
     else:
       self.compute_gb = compute_gb_honda
+
+    if CP.carFingerprint in HONDA_BOSCH and CP.carFingerprint not in (CAR.CRV_HYBRID, CAR.CRV, CAR.CRV_5G):
+      self.allow_gas_press = True
+    self.prev_lane_1 = 0
+    self.prev_lane_2 = 0
+    self.camera_keys = []
+    self.can_time = 0
+    params = Params()
+    self.user_id = params.get('DongleId')
+    self.gernbyServer = None
+    self.send_frames = 0
+    self.car_insert_format = 'userData,fingerprint=%s,user=%s ' % (self.CP.carFingerprint.replace(" ","_"), str(self.user_id)[2:-1]) 
+    self.car_insert_format += 'v_ego=%s,request=%s,angle_steers=%s,angle_rate=%s,driver_torque=%s,angle_rate_eps=%s,yaw_rate_can=%s,lateral_accel=%s,long_accel=%s,p=%s,i=%s,f=%s,angle_steers_des=%s %s\n~'
+    self.car_values = [self.car_insert_format]
+
 
   @staticmethod
   def calc_accel_override(a_ego, a_target, v_ego, v_target):
