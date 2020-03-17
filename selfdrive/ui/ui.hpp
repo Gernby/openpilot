@@ -38,6 +38,12 @@
 #define ALERTSIZE_MID 2
 #define ALERTSIZE_FULL 3
 
+#define COLOR_BLACK_ALPHA nvgRGBA(0, 0, 0, 85)
+#define COLOR_WHITE nvgRGBA(255, 255, 255, 255)
+#define COLOR_WHITE_ALPHA nvgRGBA(255, 255, 255, 85)
+#define COLOR_YELLOW nvgRGBA(218, 202, 37, 255)
+#define COLOR_RED nvgRGBA(201, 34, 49, 255)
+
 #ifndef QCOM
   #define UI_60FPS
 #endif
@@ -51,8 +57,7 @@ const int vwp_h = 1080;
 const int nav_w = 640;
 const int nav_ww= 760;
 const int sbr_w = 300;
-const int bdr_s = 0; 
-const int bdr_is = 30;
+const int bdr_s = 30;
 const int box_x = sbr_w+bdr_s;
 const int box_y = bdr_s;
 const int box_w = vwp_w-sbr_w-(bdr_s*2);
@@ -61,6 +66,14 @@ const int viz_w = vwp_w-(bdr_s*2);
 const int header_h = 420;
 const int footer_h = 280;
 const int footer_y = vwp_h-bdr_s-footer_h;
+const int settings_btn_h = 117;
+const int settings_btn_w = 200;
+const int settings_btn_x = 50;
+const int settings_btn_y = 35;
+const int home_btn_h = 180;
+const int home_btn_w = 180;
+const int home_btn_x = 60;
+const int home_btn_y = vwp_h - home_btn_h - 40;
 
 const int UI_FREQ = 30;   // Hz
 
@@ -73,8 +86,8 @@ const int SET_SPEED_NA = 255;
 const uint8_t bg_colors[][4] = {
   [STATUS_STOPPED] = {0x07, 0x23, 0x39, 0xff},
   [STATUS_DISENGAGED] = {0x17, 0x33, 0x49, 0xff},
-  [STATUS_ENGAGED] = {0x17, 0x86, 0x44, 0x0f},
-  [STATUS_WARNING] = {0xDA, 0x6F, 0x25, 0x0f},
+  [STATUS_ENGAGED] = {0x17, 0x86, 0x44, 0xff},
+  [STATUS_WARNING] = {0xDA, 0x6F, 0x25, 0xff},
   [STATUS_ALERT] = {0xC9, 0x22, 0x31, 0xff},
 };
 
@@ -99,14 +112,13 @@ typedef struct UIScene {
   bool decel_for_model;
 
   float speedlimit;
-  float angleSteers;
-  float speedlimitaheaddistance;
-  bool speedlimitahead_valid;
   bool speedlimit_valid;
   bool map_valid;
-  bool brakeLights;
 
-
+  float output_scale;
+  bool recording;
+  float angleSteers;
+  bool steerOverride;
   float curvature;
   int engaged;
   bool engageable;
@@ -122,9 +134,10 @@ typedef struct UIScene {
   int lead_status;
   float lead_d_rel, lead_y_rel, lead_v_rel;
 
-  int front_box_x, front_box_y, front_box_width, front_box_height;
+  int lead_status2;
+  float lead_d_rel2, lead_y_rel2, lead_v_rel2;
 
-  bool recording;
+  int front_box_x, front_box_y, front_box_width, front_box_height;
 
   uint64_t alert_ts;
   char alert_text1[1024];
@@ -137,27 +150,15 @@ typedef struct UIScene {
   // Used to show gps planner status
   bool gps_planner_active;
 
-  // dev ui
-  float angleSteersDes;
-  float pa0;
+  uint8_t networkType;
+  uint8_t networkStrength;
+  int batteryPercent;
+  char batteryStatus[64];
   float freeSpace;
-  bool steerOverride;
-  float output_scale;
-  
-  int odometer;
-  int engineRPM;
-  float tripDistance;
-  
-  int cpu0;
-  float gpsAccuracyPhone;
-  float altitudePhone;
-  float speedPhone;
-  float bearingPhone;
-
-  float gpsAccuracyUblox;
-  float altitudeUblox;
-  float speedUblox;
-  float bearingUblox;
+  uint8_t thermalStatus;
+  int paTemp;
+  int hwType;
+  int satelliteCount;
 } UIScene;
 
 typedef struct {
@@ -195,7 +196,11 @@ typedef struct UIState {
   int img_turn;
   int img_face;
   int img_map;
-  int img_brake;
+  int img_button_settings;
+  int img_button_home;
+  int img_battery;
+  int img_battery_charging;
+  int img_network[6];
 
   // sockets
   Context *ctx;
@@ -205,10 +210,13 @@ typedef struct UIState {
   SubSocket *radarstate_sock;
   SubSocket *map_data_sock;
   SubSocket *uilayout_sock;
+  SubSocket *thermal_sock;
+  SubSocket *health_sock;
+  SubSocket *ubloxgnss_sock;
   SubSocket *carstate_sock;
-  SubSocket *gpslocationexternal_sock;
   SubSocket *livempc_sock;  
   Poller * poller;
+  Poller * ublox_poller;
 
   int active_app;
 
@@ -252,6 +260,7 @@ typedef struct UIState {
   int is_metric_timeout;
   int longitudinal_control_timeout;
   int limit_set_speed_timeout;
+  int hardware_timeout;
 
   bool controls_seen;
 
@@ -285,8 +294,9 @@ typedef struct UIState {
 
 // API
 void ui_draw_vision_alert(UIState *s, int va_size, int va_color,
-                          const char* va_text1, const char* va_text2); 
+                          const char* va_text1, const char* va_text2);
 void ui_draw(UIState *s);
+void ui_draw_sidebar(UIState *s);
 void ui_nvg_init(UIState *s);
 
 #endif
