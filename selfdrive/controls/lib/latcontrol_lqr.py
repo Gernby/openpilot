@@ -23,6 +23,9 @@ class LatControlLQR():
 
     self.sat_count_rate = 1.0 * DT_CTRL
     self.sat_limit = CP.steerLimitTimer
+    self.accel_limit = 0.1      # 100x degrees/sec**2
+    self.angle_rate_des = 0.0    # degrees/sec, rate dynamically limited by accel_limit
+    self.angle_steers_des = 0.0
 
     self.reset()
 
@@ -49,8 +52,14 @@ class LatControlLQR():
     steers_max = get_steer_max(CP, v_ego)
     torque_scale = (0.45 + v_ego / 60.0)**2  # Scale actuator model with speed
 
+    if not steer_override and abs(angle_steers) < 10 and v_ego > 10:
+      self.angle_rate_des = min(self.angle_rate_des + self.accel_limit * v_ego, max(self.angle_rate_des - self.accel_limit * v_ego, path_plan.angleSteers - path_plan.angleOffset - self.angle_steers_des))
+      self.angle_steers_des = self.angle_steers_des + self.angle_rate_des
+    else:
+      self.angle_rate_des = angle_steers_rate / 100.
+      self.angle_steers_des = path_plan.angleSteers - path_plan.angleOffset
+
     # Subtract offset. Zero angle should correspond to zero torque
-    self.angle_steers_des = path_plan.angleSteers - path_plan.angleOffset
     angle_steers -= path_plan.angleOffset
 
     # Update Kalman filter
@@ -62,6 +71,8 @@ class LatControlLQR():
       lqr_log.active = False
       lqr_output = 0.
       self.reset()
+      self.angle_rate_des = angle_steers_rate / 100.
+      self.angle_steers_des = angle_steers
     else:
       lqr_log.active = True
 
